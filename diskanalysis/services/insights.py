@@ -7,21 +7,9 @@ from diskanalysis.config.schema import AppConfig, PatternRule
 from diskanalysis.models.enums import InsightCategory
 from diskanalysis.models.insight import Insight, InsightBundle
 from diskanalysis.models.scan import ScanNode, norm_sep
-from diskanalysis.services.patterns import CompiledRule, compiled_matches, compile_rules
+from diskanalysis.services.patterns import CompiledRuleSet, compile_ruleset, match_all
 
 MAX_INSIGHTS_PER_CATEGORY = 1000
-
-
-def _find_rule(
-    compiled: list[CompiledRule],
-    path: str,
-    basename: str,
-    is_dir: bool,
-) -> PatternRule | None:
-    for cr in compiled:
-        if compiled_matches(cr, path, basename, is_dir):
-            return cr.rule
-    return None
 
 
 # Heap entry: (size_bytes, path, Insight).  Using size as the key so the
@@ -52,11 +40,39 @@ def _heap_push(
 
 
 def generate_insights(root: ScanNode, config: AppConfig) -> InsightBundle:
-    # --- compile all pattern rules once ---
-    compiled_temp = compile_rules(config.temp_patterns)
-    compiled_cache = compile_rules(config.cache_patterns)
-    compiled_build = compile_rules(config.build_artifact_patterns)
-    compiled_custom = compile_rules(config.custom_patterns)
+    # --- build additional path rules ---
+    additional_paths: list[tuple[str, PatternRule]] = []
+    for category, sources in (
+        (InsightCategory.TEMP, config.additional_temp_paths),
+        (InsightCategory.CACHE, config.additional_cache_paths),
+    ):
+        for raw_base in sources:
+            base = norm_sep(str(Path(raw_base).expanduser())).rstrip("/")
+            additional_paths.append(
+                (
+                    base,
+                    PatternRule(
+                        name=f"Additional {category.value} path",
+                        pattern=base,
+                        category=category,
+                        safe_to_delete=category is InsightCategory.TEMP,
+                        recommendation="Review configured path and clean safely.",
+                        apply_to="both",
+                        stop_recursion=False,
+                    ),
+                )
+            )
+
+    # --- compile all rules into a single dispatch structure ---
+    ruleset: CompiledRuleSet = compile_ruleset(
+        [
+            (config.temp_patterns, "temp"),
+            (config.cache_patterns, "cache"),
+            (config.build_artifact_patterns, "build"),
+            (config.custom_patterns, "custom"),
+        ],
+        additional_paths=additional_paths or None,
+    )
 
     # --- per-category min-heaps ---
     heaps: dict[InsightCategory, list[_HeapEntry]] = {
@@ -78,41 +94,15 @@ def generate_insights(root: ScanNode, config: AppConfig) -> InsightBundle:
         category_paths[cat].add(insight.path)
         _heap_push(heaps[cat], seen[cat], insight, MAX_INSIGHTS_PER_CATEGORY)
 
-    # --- additional user-configured paths ---
-    additional_rules: list[tuple[str, PatternRule]] = []
-    for category, sources in (
-        (InsightCategory.TEMP, config.additional_temp_paths),
-        (InsightCategory.CACHE, config.additional_cache_paths),
-    ):
-        for raw_base in sources:
-            base = norm_sep(str(Path(raw_base).expanduser())).rstrip("/")
-            additional_rules.append(
-                (
-                    base,
-                    PatternRule(
-                        name=f"Additional {category.value} path",
-                        pattern=base,
-                        category=category,
-                        safe_to_delete=category is InsightCategory.TEMP,
-                        recommendation="Review configured path and clean safely.",
-                        apply_to="both",
-                        stop_recursion=False,
-                    ),
-                )
-            )
-
-    def _check_additional(
-        node_path: str, category: InsightCategory
-    ) -> PatternRule | None:
-        normalized = norm_sep(node_path).rstrip("/")
-        for base, rule in additional_rules:
-            if rule.category is not category:
-                continue
-            if normalized == base or normalized.startswith(f"{base}/"):
-                return rule
-        return None
+    # --- thresholds ---
+    large_file_bytes = config.thresholds.large_file_bytes
+    large_dir_bytes = config.thresholds.large_dir_bytes
 
     # --- main traversal ---
+    _TEMP = InsightCategory.TEMP
+    _CACHE = InsightCategory.CACHE
+    _temp_cache = {_TEMP.value, _CACHE.value}
+
     stack: list[tuple[ScanNode, bool]] = [(root, False)]
     while stack:
         node, in_temp_or_cache = stack.pop()
@@ -130,23 +120,20 @@ def generate_insights(root: ScanNode, config: AppConfig) -> InsightBundle:
         lpath = path.lower()
         lbase = basename.lower()
 
-        temp_rule = _find_rule(
-            compiled_temp, lpath, lbase, is_dir
-        ) or _check_additional(path, InsightCategory.TEMP)
-        cache_rule = _find_rule(
-            compiled_cache, lpath, lbase, is_dir
-        ) or _check_additional(path, InsightCategory.CACHE)
-        build_rule = _find_rule(compiled_build, lpath, lbase, is_dir)
-        custom_rule = _find_rule(compiled_custom, lpath, lbase, is_dir)
+        # Single-pass match across all categories
+        matched_rules = match_all(ruleset, lpath, lbase, is_dir, path)
 
-        local_in_temp_cache = temp_rule is not None or cache_rule is not None
-
-        for rule in (temp_rule, cache_rule, build_rule, custom_rule):
-            if rule is not None:
-                _record(_insight_from_rule(node, rule))
+        local_in_temp_cache = False
+        build_rule: PatternRule | None = None
+        for rule in matched_rules:
+            _record(_insight_from_rule(node, rule))
+            if rule.category.value in _temp_cache:
+                local_in_temp_cache = True
+            if rule.stop_recursion:
+                build_rule = rule
 
         if not local_in_temp_cache:
-            if not is_dir and node.size_bytes >= config.thresholds.large_file_bytes:
+            if not is_dir and node.size_bytes >= large_file_bytes:
                 _record(
                     Insight(
                         path=path,
@@ -159,7 +146,7 @@ def generate_insights(root: ScanNode, config: AppConfig) -> InsightBundle:
                     )
                 )
 
-            if is_dir and node.size_bytes >= config.thresholds.large_dir_bytes:
+            if is_dir and node.size_bytes >= large_dir_bytes:
                 _record(
                     Insight(
                         path=path,
@@ -173,7 +160,7 @@ def generate_insights(root: ScanNode, config: AppConfig) -> InsightBundle:
                 )
 
         if is_dir:
-            if build_rule is not None and build_rule.stop_recursion:
+            if build_rule is not None:
                 continue
             for child in reversed(node.children):
                 stack.append((child, local_in_temp_cache))
