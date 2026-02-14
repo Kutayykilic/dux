@@ -132,9 +132,7 @@ def scan_path(
                             break
 
                         try:
-                            stat_result = entry.stat(
-                                follow_symlinks=follow_symlinks
-                            )
+                            stat_result = entry.stat(follow_symlinks=follow_symlinks)
                         except OSError:
                             with stats_lock:
                                 stats.access_errors += 1

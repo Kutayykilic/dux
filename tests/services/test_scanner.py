@@ -90,9 +90,7 @@ def test_symlinks_are_not_followed(tmp_path: Path) -> None:
     assert isinstance(result, Ok)
     snapshot = result.unwrap()
 
-    link_node = next(
-        node for node in snapshot.root.children if node.name == "link_dir"
-    )
+    link_node = next(node for node in snapshot.root.children if node.name == "link_dir")
     assert not link_node.is_dir
 
 
