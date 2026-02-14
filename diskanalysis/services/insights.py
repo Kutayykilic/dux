@@ -122,14 +122,18 @@ def generate_insights(root: ScanNode, config: AppConfig) -> InsightBundle:
         basename = node.name
         is_dir = node.is_dir
 
+        # Lowercase once per entry for case-insensitive pattern matching.
+        lpath = path.lower()
+        lbase = basename.lower()
+
         temp_rule = _find_rule(
-            compiled_temp, path, basename, is_dir
+            compiled_temp, lpath, lbase, is_dir
         ) or _check_additional(path, InsightCategory.TEMP)
         cache_rule = _find_rule(
-            compiled_cache, path, basename, is_dir
+            compiled_cache, lpath, lbase, is_dir
         ) or _check_additional(path, InsightCategory.CACHE)
-        build_rule = _find_rule(compiled_build, path, basename, is_dir)
-        custom_rule = _find_rule(compiled_custom, path, basename, is_dir)
+        build_rule = _find_rule(compiled_build, lpath, lbase, is_dir)
+        custom_rule = _find_rule(compiled_custom, lpath, lbase, is_dir)
 
         local_in_temp_cache = temp_rule is not None or cache_rule is not None
 

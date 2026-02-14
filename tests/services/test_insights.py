@@ -119,3 +119,37 @@ def test_custom_pattern_detection() -> None:
     bundle = generate_insights(_tree_with(node), config)
 
     assert any(item.category is InsightCategory.CUSTOM for item in bundle.insights)
+
+
+def test_case_insensitive_matching() -> None:
+    """Pattern matching should be case-insensitive (e.g. .DS_STORE matches .DS_Store rule)."""
+    config = default_config()
+    # Mixed-case path that should match the lowercase ".ds_store" pattern
+    node = _file("/root/project/.DS_STORE", size=4096)
+    bundle = generate_insights(_tree_with(node), config)
+
+    assert any(item.category is InsightCategory.TEMP for item in bundle.insights)
+
+
+def test_case_insensitive_extension_matching() -> None:
+    """File extensions like .LOG should match *.log rules."""
+    config = default_config()
+    node = _file("/root/app/debug.LOG", size=1024)
+    bundle = generate_insights(_tree_with(node), config)
+
+    assert any(item.category is InsightCategory.TEMP for item in bundle.insights)
+
+
+def test_case_insensitive_directory_matching() -> None:
+    """Directory names like Node_Modules should match node_modules rule."""
+    config = default_config()
+    node = _dir(
+        "/root/project/Node_Modules",
+        2 * 1024 * 1024,
+        _file("/root/project/Node_Modules/a.js", 100),
+    )
+    bundle = generate_insights(_tree_with(node), config)
+
+    assert any(
+        item.category is InsightCategory.BUILD_ARTIFACT for item in bundle.insights
+    )

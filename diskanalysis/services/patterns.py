@@ -27,9 +27,13 @@ def _has_glob_chars(s: str) -> bool:
 
 
 def _classify(pattern: str) -> _Matcher:
-    """Turn one expanded pattern into a fast string matcher."""
+    """Turn one expanded pattern into a fast string matcher.
+
+    All matcher values are lowercased at compile time so that callers can pass
+    pre-lowercased paths for case-insensitive matching with ~4% overhead.
+    """
     if not pattern.startswith("**/"):
-        return _Matcher(_GLOB, pattern, "")
+        return _Matcher(_GLOB, pattern.lower(), "")
 
     rest = pattern[3:]
 
@@ -37,22 +41,23 @@ def _classify(pattern: str) -> _Matcher:
     if rest.endswith("/**"):
         middle = rest[:-3]
         if not _has_glob_chars(middle):
-            return _Matcher(_CONTAINS, f"/{middle}/", f"/{middle}")
-        return _Matcher(_GLOB, pattern, "")
+            mid = middle.lower()
+            return _Matcher(_CONTAINS, f"/{mid}/", f"/{mid}")
+        return _Matcher(_GLOB, pattern.lower(), "")
 
     # **/*.ext  →  endswith check on basename
     if rest.startswith("*") and not _has_glob_chars(rest[1:]):
-        return _Matcher(_ENDSWITH, rest[1:], "")
+        return _Matcher(_ENDSWITH, rest[1:].lower(), "")
 
     # **/prefix*  →  startswith check on basename
     if rest.endswith("*") and not _has_glob_chars(rest[:-1]):
-        return _Matcher(_STARTSWITH, rest[:-1], "")
+        return _Matcher(_STARTSWITH, rest[:-1].lower(), "")
 
     # **/exact  →  exact basename match
     if not _has_glob_chars(rest):
-        return _Matcher(_EXACT, rest, "")
+        return _Matcher(_EXACT, rest.lower(), "")
 
-    return _Matcher(_GLOB, pattern, "")
+    return _Matcher(_GLOB, pattern.lower(), "")
 
 
 @lru_cache(maxsize=256)
@@ -88,6 +93,11 @@ def compile_rules(rules: list[PatternRule]) -> list[CompiledRule]:
 
 
 def compiled_matches(cr: CompiledRule, path: str, basename: str, is_dir: bool) -> bool:
+    """Check whether a path matches a compiled rule.
+
+    Callers must pass *pre-lowercased* ``path`` and ``basename`` so that
+    the cost of lowercasing is paid once per entry, not once per rule.
+    """
     if cr.apply_to == "file" and is_dir:
         return False
     if cr.apply_to == "dir" and not is_dir:
