@@ -519,14 +519,6 @@ def default_config() -> AppConfig:
             stop_recursion=True,
         ),
         PatternRule(
-            "Binary output",
-            "**/bin/**",
-            InsightCategory.BUILD_ARTIFACT,
-            True,
-            "Rebuild binaries",
-            stop_recursion=True,
-        ),
-        PatternRule(
             "Coverage artifacts",
             "**/coverage/**",
             InsightCategory.BUILD_ARTIFACT,
@@ -565,15 +557,6 @@ def default_config() -> AppConfig:
             InsightCategory.BUILD_ARTIFACT,
             True,
             "zig build",
-            stop_recursion=True,
-        ),
-        # ── .NET / NuGet ──
-        PatternRule(
-            "NuGet packages",
-            "**/packages/**",
-            InsightCategory.BUILD_ARTIFACT,
-            True,
-            "dotnet restore",
             stop_recursion=True,
         ),
     ]

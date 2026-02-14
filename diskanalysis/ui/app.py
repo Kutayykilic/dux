@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -107,7 +108,8 @@ class HelpOverlay(ModalScreen[None]):
                 "  [ / ]: Previous/Next page",
                 "",
                 "[b #81a2be]Other[/]",
-                "  y: Yank (copy path/row to clipboard)",
+                "  y: Yank full path to clipboard",
+                "  Y: Yank display text to clipboard",
                 "  ?: Toggle help",
                 "  q / Ctrl+C: Quit",
             ]
@@ -272,12 +274,7 @@ class DiskAnalyzerApp(App[None]):
             bar_text = (
                 relative_bar(row.size_bytes, total, 18) if row.size_bytes > 0 else ""
             )
-            if row.path == "separator":
-                if is_temp or is_browse:
-                    table.add_row("─" * 40, "", "", "")
-                else:
-                    table.add_row("─" * 40, "", "")
-            elif is_temp:
+            if is_temp:
                 table.add_row(row.name, size_text, row.type_label, row.detail)
             elif is_browse:
                 table.add_row(row.name, size_text, bar_text, row.detail)
@@ -304,7 +301,7 @@ class DiskAnalyzerApp(App[None]):
         if trimmed_text:
             left += f" | {trimmed_text}"
 
-        hints = "q quit | ? help | Tab views | y yank"
+        hints = "q quit | ? help | Tab views | y yank path | Y yank name"
         if self.current_view == "browse":
             hints += " | h/l collapse/expand | Enter/Backspace drill-in/out"
         if paged_total > self._page_size:
@@ -414,44 +411,44 @@ class DiskAnalyzerApp(App[None]):
 
         rows: list[DisplayRow] = [
             DisplayRow(
-                path="stats.total",
+                path="",
                 name=f"Total Size: {format_bytes(self.root.size_bytes)}",
                 size_bytes=self.root.size_bytes,
                 detail="",
             ),
             DisplayRow(
-                path="stats.files",
+                path="",
                 name=f"Files: {self.stats.files:,}",
                 size_bytes=0,
                 detail="",
             ),
             DisplayRow(
-                path="stats.dirs",
+                path="",
                 name=f"Directories: {self.stats.directories:,}",
                 size_bytes=0,
                 detail="",
             ),
             DisplayRow(
-                path="stats.temp",
+                path="",
                 name=f"Temp: {format_bytes(temp_size)}",
                 size_bytes=temp_size,
                 detail="",
             ),
             DisplayRow(
-                path="stats.cache",
+                path="",
                 name=f"Cache: {format_bytes(cache_size)}",
                 size_bytes=cache_size,
                 detail="",
             ),
             DisplayRow(
-                path="stats.build",
+                path="",
                 name=f"Build Artifacts: {format_bytes(build_size)}",
                 size_bytes=build_size,
                 detail="",
             ),
             DisplayRow(
-                path="separator",
-                name=f"── Largest {self._overview_top} folders ──",
+                path="",
+                name=f"─────── Largest {self._overview_top} folders ───────",
                 size_bytes=0,
                 detail="",
             ),
@@ -698,18 +695,11 @@ class DiskAnalyzerApp(App[None]):
         except (subprocess.CalledProcessError, FileNotFoundError):
             return False
 
-    def _yank(self) -> None:
+    def _yank(self, extract_fn: Callable[[DisplayRow], str]) -> None:
         self._sync_selection_from_table()
         if not self.rows:
             return
-        row = self.rows[self.selected_index]
-
-        if self.current_view == "overview":
-            node = self.node_by_path.get(row.path)
-            text = row.path if node is not None else row.name
-        else:
-            text = row.path
-
+        text = extract_fn(self.rows[self.selected_index])
         if self._copy_to_clipboard(text):
             self.notify(f"Copied: {text}", timeout=2)
         else:
@@ -810,7 +800,10 @@ class DiskAnalyzerApp(App[None]):
         if self._handle_global_key(key):
             return
         if key == "y":
-            self._yank()
+            self._yank(lambda row: shlex.quote(row.path) if row.path else shlex.quote(row.name))
+            return
+        if key in {"Y", "shift+y"} or char == "Y":
+            self._yank(lambda row: shlex.quote(row.name))
             return
         if self._handle_navigation_key(key, char):
             return
