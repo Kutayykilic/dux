@@ -29,14 +29,14 @@ uv run dux
 # Analyze a specific path
 uv run dux ~/src
 
-# Non-interactive summary
+# Top-level size summary
 uv run dux --summary ~/src
 
-# Focus on caches
-uv run dux --cache ~/src
+# Largest cache files/directories
+uv run dux --top-cache ~/src
 
-# Focus on temp/build artifacts
-uv run dux --temp ~/src
+# Largest temp/build artifacts
+uv run dux --top-temp ~/src
 ```
 
 ## TUI Views
@@ -45,9 +45,9 @@ Switch views with `Tab`/`Shift+Tab` or press the shortcut key directly.
 
 | Key | View | Description |
 |-----|------|-------------|
-| `o` | **Overview** | Total size, file/dir counts, temp/cache/build totals, largest folders |
+| `o` | **Overview** | Total size, file/dir counts, temp/cache/build totals, largest directories |
 | `b` | **Browse** | Expandable directory tree with size bars and timestamps |
-| `d` | **Folders by Size** | Paginated list of largest directories |
+| `d` | **Directories by Size** | Paginated list of largest directories |
 | `f` | **Files by Size** | Paginated list of largest individual files |
 | `t` | **Temporary Files** | All detected temp, cache, and build artifact items |
 
@@ -89,11 +89,11 @@ uv run dux [PATH] [OPTIONS]
 
 | Option | Description |
 |--------|-------------|
-| `--summary` / `-s` | Non-interactive summary output |
-| `--temp` / `-t` | Focus on temp/build artifacts |
-| `--cache` / `-c` | Focus on caches |
-| `--top-folders` | Focus on largest folders |
-| `--top-files` | Focus on largest files |
+| `--summary` / `-s` | Show top-level size summary |
+| `--top-temp` / `-t` | Show largest temp/build artifacts |
+| `--top-cache` / `-c` | Show largest cache files/directories |
+| `--top-dirs` / `-d` | Show largest directories |
+| `--top-files` / `-f` | Show largest files |
 | `--workers` / `-w` | Number of scan threads (default: from config) |
 | `--max-depth` | Maximum directory depth to scan |
 | `--top` | Number of items in summary output |
@@ -117,9 +117,9 @@ Key settings:
   "scanWorkers": 4,
   "maxDepth": null,
   "pageSize": 100,
-  "overviewTopFolders": 100,
+  "overviewTopDirs": 100,
   "scrollStep": 20,
-  "summaryTopCount": 15,
+  "topCount": 15,
   "additionalTempPaths": [],
   "additionalCachePaths": [],
   "tempPatterns": [...],

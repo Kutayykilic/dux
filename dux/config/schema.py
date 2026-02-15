@@ -24,10 +24,10 @@ class AppConfig:
     build_artifact_patterns: list[PatternRule] = field(default_factory=list)
     max_depth: int | None = None
     scan_workers: int = 4
-    summary_top_count: int = 15
+    top_count: int = 15
     page_size: int = 100
     max_insights_per_category: int = 1000
-    overview_top_folders: int = 100
+    overview_top_dirs: int = 100
     scroll_step: int = 10
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,10 +36,10 @@ class AppConfig:
             "additionalCachePaths": self.additional_cache_paths,
             "maxDepth": self.max_depth,
             "scanWorkers": self.scan_workers,
-            "summaryTopCount": self.summary_top_count,
+            "topCount": self.top_count,
             "pageSize": self.page_size,
             "maxInsightsPerCategory": self.max_insights_per_category,
-            "overviewTopFolders": self.overview_top_folders,
+            "overviewTopDirs": self.overview_top_dirs,
             "scrollStep": self.scroll_step,
             "tempPatterns": [_rule_to_dict(rule) for rule in self.temp_patterns],
             "cachePatterns": [_rule_to_dict(rule) for rule in self.cache_patterns],
@@ -85,13 +85,13 @@ def from_dict(data: dict[str, Any], defaults: AppConfig) -> AppConfig:
         additional_cache_paths=[str(x) for x in data.get("additionalCachePaths", defaults.additional_cache_paths)],
         max_depth=int(max_depth_raw) if max_depth_raw is not None else None,
         scan_workers=max(1, int(data.get("scanWorkers", defaults.scan_workers))),
-        summary_top_count=max(1, int(data.get("summaryTopCount", defaults.summary_top_count))),
+        top_count=max(1, int(data.get("topCount", defaults.top_count))),
         page_size=max(10, int(data.get("pageSize", defaults.page_size))),
         max_insights_per_category=max(
             10,
             int(data.get("maxInsightsPerCategory", defaults.max_insights_per_category)),
         ),
-        overview_top_folders=max(5, int(data.get("overviewTopFolders", defaults.overview_top_folders))),
+        overview_top_dirs=max(5, int(data.get("overviewTopDirs", defaults.overview_top_dirs))),
         scroll_step=max(1, int(data.get("scrollStep", defaults.scroll_step))),
         temp_patterns=[_rule_from_dict(x) for x in data["tempPatterns"]]
         if "tempPatterns" in data

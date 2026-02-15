@@ -20,7 +20,7 @@ from dux.config.loader import load_config, sample_config_json
 from dux.models.scan import ScanError, ScanErrorCode, ScanOptions, ScanResult
 from dux.services.insights import generate_insights
 from dux.services.scanner import scan_path
-from dux.services.summary import render_focused_summary, render_summary
+from dux.services.summary import stats_panel, render_focused_summary, render_summary
 from dux.ui.app import DuxApp
 
 console = Console()
@@ -124,11 +124,11 @@ def _scan_with_progress(path: Path, options: ScanOptions, workers: int) -> ScanR
 
 def run(
     path: Annotated[str, typer.Argument(help="Path to analyze.")] = ".",
-    temp: Annotated[bool, typer.Option("--temp", "-t", help="Focus on temp/build artifacts.")] = False,
-    cache: Annotated[bool, typer.Option("--cache", "-c", help="Focus on caches.")] = False,
-    top_folders: Annotated[bool, typer.Option("--top-folders", help="Focus on largest folders.")] = False,
-    top_files: Annotated[bool, typer.Option("--top-files", help="Focus on largest files.")] = False,
-    summary: Annotated[bool, typer.Option("--summary", "-s", help="Render non-interactive summary.")] = False,
+    top_temp: Annotated[bool, typer.Option("--top-temp", "-t", help="Show largest temp/build artifacts.")] = False,
+    top_cache: Annotated[bool, typer.Option("--top-cache", "-c", help="Show largest cache files/directories.")] = False,
+    top_dirs: Annotated[bool, typer.Option("--top-dirs", "-d", help="Show largest directories.")] = False,
+    top_files: Annotated[bool, typer.Option("--top-files", "-f", help="Focus on largest files.")] = False,
+    summary: Annotated[bool, typer.Option("--summary", "-s", help="Show top-level size summary.")] = False,
     sample_config: Annotated[bool, typer.Option("--sample-config", help="Print sample config JSON.")] = False,
     max_depth: Annotated[int | None, typer.Option("--max-depth", help="Max directory depth to scan.")] = None,
     workers: Annotated[int | None, typer.Option("--workers", "-w", help="Number of scan workers.")] = None,
@@ -137,7 +137,7 @@ def run(
         typer.Option("--top", help="Number of top items to show in summary."),
     ] = None,
     max_insights: Annotated[int | None, typer.Option("--max-insights", help="Max insights per category.")] = None,
-    overview_folders: Annotated[int | None, typer.Option("--overview-folders", help="Top folders in overview.")] = None,
+    overview_dirs: Annotated[int | None, typer.Option("--overview-dirs", help="Top directories in overview.")] = None,
     scroll_step: Annotated[int | None, typer.Option("--scroll-step", help="Lines to jump on PgUp/PgDn.")] = None,
     page_size: Annotated[int | None, typer.Option("--page-size", help="Rows per page in TUI.")] = None,
 ) -> None:
@@ -148,8 +148,6 @@ def run(
     if sample_config:
         console.print(sample_config_json())
         raise typer.Exit(0)
-
-    has_focus = temp or cache or top_folders or top_files
 
     config_result = load_config()
     if isinstance(config_result, Err):
@@ -162,11 +160,11 @@ def run(
     if workers is not None:
         overrides["scan_workers"] = max(1, workers)
     if top is not None:
-        overrides["summary_top_count"] = max(1, top)
+        overrides["top_count"] = max(1, top)
     if max_insights is not None:
         overrides["max_insights_per_category"] = max(10, max_insights)
-    if overview_folders is not None:
-        overrides["overview_top_folders"] = max(5, overview_folders)
+    if overview_dirs is not None:
+        overrides["overview_top_dirs"] = max(5, overview_dirs)
     if scroll_step is not None:
         overrides["scroll_step"] = max(1, scroll_step)
     if page_size is not None:
@@ -190,39 +188,30 @@ def run(
     with console.status("[bold #8abeb7]Generating insights...[/]"):
         bundle = generate_insights(snapshot.root, config)
 
-    if summary:
-        if not has_focus:
-            render_summary(console, snapshot.root, snapshot.stats, bundle, config)
-        else:
-            render_focused_summary(
-                console,
-                snapshot.root,
-                snapshot.stats,
-                bundle,
-                config.summary_top_count,
-                temp=temp,
-                cache=cache,
-                top_folders=top_folders,
-                top_files=top_files,
-            )
+    if summary or top_temp or top_cache or top_dirs or top_files:
+        root_prefix = snapshot.root.path.rstrip("/") + "/"
+        console.print(stats_panel(snapshot.root, snapshot.stats))
+        if summary:
+            render_summary(console, snapshot.root, root_prefix)
+        render_focused_summary(
+            console,
+            snapshot.root,
+            bundle,
+            config.top_count,
+            root_prefix,
+            top_temp=top_temp,
+            top_cache=top_cache,
+            top_dirs=top_dirs,
+            top_files=top_files,
+        )
         raise typer.Exit(0)
 
-    initial_view = "overview"
-    if temp or cache:
-        initial_view = "temp"
-    elif top_folders:
-        initial_view = "large_dir"
-    elif top_files:
-        initial_view = "large_file"
-
-    tui = DuxApp(
+    DuxApp(
         root=snapshot.root,
         stats=snapshot.stats,
         bundle=bundle,
         config=config,
-        initial_view=initial_view,
-    )
-    tui.run()
+    ).run()
 
 
 def cli() -> None:

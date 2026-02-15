@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from dux.models.enums import InsightCategory
+from dux.models.enums import InsightCategory, NodeKind
 
 
 @dataclass(slots=True)
@@ -12,6 +12,7 @@ class Insight:
     category: InsightCategory
     summary: str
     modified_ts: float
+    kind: NodeKind = NodeKind.FILE
 
 
 @dataclass(slots=True)

@@ -152,6 +152,7 @@ def _insight_from_rule(node: ScanNode, rule: PatternRule) -> Insight:
         category=rule.category,
         summary=rule.name,
         modified_ts=node.modified_ts,
+        kind=node.kind,
     )
 
 

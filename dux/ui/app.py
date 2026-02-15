@@ -27,7 +27,7 @@ _TAB_LABELS: dict[str, str] = {
     "overview": "Overview",
     "browse": "Browse",
     "temp": "Temporary Files",
-    "large_dir": "Folders by Size",
+    "large_dir": "Directories by Size",
     "large_file": "Files by Size",
 }
 
@@ -200,7 +200,7 @@ class DuxApp(App[None]):
 
         self._page_size = config.page_size
         self._scroll_step = config.scroll_step
-        self._overview_top = config.overview_top_folders
+        self._overview_top = config.overview_top_dirs
         self._top_n_limit = config.max_insights_per_category
         self._root_prefix = root.path.rstrip("/") + "/"
 
@@ -510,7 +510,7 @@ class DuxApp(App[None]):
             ),
             DisplayRow(
                 path="",
-                name=f"─────── Largest {self._overview_top} folders ───────",
+                name=f"─────── Largest {self._overview_top} directories ───────",
                 size_bytes=0,
                 detail="",
             ),
@@ -561,7 +561,7 @@ class DuxApp(App[None]):
             display_path = self._relative_path(item.path)
             label = _CATEGORY_LABELS.get(item.category.value, item.category.value)
             node = self.node_by_path.get(item.path)
-            type_label = "Folder" if node is not None and node.is_dir else "File"
+            type_label = "Dir" if node is not None and node.is_dir else "File"
             rows.append(
                 DisplayRow(
                     path=item.path,

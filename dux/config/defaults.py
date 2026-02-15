@@ -356,9 +356,9 @@ def default_config() -> AppConfig:
         build_artifact_patterns=build_artifact_patterns,
         max_depth=None,
         scan_workers=4,
-        summary_top_count=15,
+        top_count=15,
         page_size=100,
         max_insights_per_category=1000,
-        overview_top_folders=100,
+        overview_top_dirs=100,
         scroll_step=20,
     )
