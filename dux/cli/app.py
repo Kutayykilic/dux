@@ -20,7 +20,7 @@ from dux.config.loader import load_config, sample_config_json
 from dux.models.scan import ScanError, ScanErrorCode, ScanOptions, ScanResult
 from dux.services.insights import generate_insights
 from dux.services.scanner import scan_path
-from dux.services.summary import stats_panel, render_focused_summary, render_summary
+from dux.services.summary import render_focused_summary, render_summary
 from dux.ui.app import DuxApp
 
 console = Console()
@@ -190,9 +190,10 @@ def run(
 
     if summary or top_temp or top_cache or top_dirs or top_files:
         root_prefix = snapshot.root.path.rstrip("/") + "/"
-        console.print(stats_panel(snapshot.root, snapshot.stats))
+        if snapshot.stats.access_errors:
+            console.print(f"[red]{snapshot.stats.access_errors:,} access errors during scan[/red]")
         if summary:
-            render_summary(console, snapshot.root, root_prefix)
+            render_summary(console, snapshot.root, snapshot.stats, root_prefix)
         render_focused_summary(
             console,
             snapshot.root,

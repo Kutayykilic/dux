@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 
 from dux.models.enums import InsightCategory, NodeKind
@@ -10,16 +9,6 @@ from dux.models.scan import ScanNode, ScanStats
 from dux.services.formatting import format_bytes
 from dux.services.insights import filter_insights
 from dux.services.tree import top_nodes
-
-
-def stats_panel(root: ScanNode, stats: ScanStats) -> Panel:
-    body = (
-        f"Files: [bold]{stats.files}[/bold]\n"
-        f"Directories: [bold]{stats.directories}[/bold]\n"
-        f"Total Size: [bold]{format_bytes(root.size_bytes)}[/bold]\n"
-        f"Access Errors: [bold]{stats.access_errors}[/bold]"
-    )
-    return Panel(body, title="Scan Summary", border_style="blue")
 
 
 def _trim(path: str, root_prefix: str) -> str:
@@ -54,20 +43,28 @@ def _top_nodes_table(title: str, root: ScanNode, top_n: int, kind: NodeKind, roo
 def render_summary(
     console: Console,
     root: ScanNode,
+    stats: ScanStats,
     root_prefix: str,
 ) -> None:
-    top_table = Table(title="Top Level Files/Directories", header_style="bold cyan")
-    top_table.add_column("Path")
-    top_table.add_column("Type", justify="center")
-    top_table.add_column("Size", justify="right")
+    table = Table(title="Top Level Summary", header_style="bold cyan")
+    table.add_column("Path")
+    table.add_column("Type", justify="center")
+    table.add_column("Size", justify="right")
 
     for child in sorted(root.children, key=lambda n: n.size_bytes, reverse=True):
-        top_table.add_row(
+        table.add_row(
             _trim(child.path, root_prefix),
             "DIR" if child.kind is NodeKind.DIRECTORY else "FILE",
             format_bytes(child.size_bytes),
         )
-    console.print(top_table)
+
+    table.add_section()
+    table.add_row("[bold]Total[/bold]", "", f"[bold]{format_bytes(root.size_bytes)}[/bold]")
+    table.add_section()
+    table.add_row(f"[bold]{stats.directories:,}[/bold] dirs", "", "")
+    table.add_row(f"[bold]{stats.files:,}[/bold] files", "", "")
+
+    console.print(table)
 
 
 def render_focused_summary(
