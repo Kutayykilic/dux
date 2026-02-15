@@ -1,93 +1,186 @@
 # DiskAnalysis
 
-Production-quality Python terminal disk analyzer with CLI and interactive TUI.
+A fast, interactive terminal disk analyzer for macOS and Linux. Scans directories in parallel, categorizes files (temp, cache, build artifacts), and presents results in a rich TUI with vim-style navigation.
 
-## Requirements
+> **100% AI-written.** The vast majority of this codebase was written by Claude (Anthropic), with contributions from Codex (OpenAI). Human involvement was limited to directing, reviewing, and benchmarking.
 
-- Python 3.13+
-- `uv`
-- macOS or Linux (Windows is not implemented yet)
+## Features
 
-## Setup
+- **Parallel scanning** with configurable thread pool (default 8 workers)
+- **Interactive TUI** with 5 views, vim keybindings, search/filter, pagination
+- **Non-interactive CLI summary** mode for scripts and quick checks
+- **670+ built-in patterns** for detecting temp files, caches, and build artifacts across dozens of ecosystems (Node, Python, Rust, Go, JVM, Swift, C++, and more)
+- **Fully configurable** via JSON config with pattern overrides and custom paths
+- **Analysis-only** - never deletes, moves, or modifies your files
 
-```bash
-uv sync --extra dev
-```
+## Quick Start
 
-## Run
-
-```bash
-uv run diskanalysis [PATH]
-uv run diskanalysis --summary [PATH]
-uv run diskanalysis --temp [PATH]
-uv run diskanalysis --cache [PATH]
-uv run diskanalysis --temp --summary [PATH]
-uv run diskanalysis --cache --summary [PATH]
-uv run diskanalysis --sample-config
-```
-
-If no `PATH` is provided, the current directory is analyzed.
-
-## Config
-
-- Path: `~/.config/diskanalysis/config.json`
-- Missing config: defaults are used silently
-- Invalid config: warning is printed and defaults are used
-
-Generate full sample config:
+Requires Python 3.13+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv run diskanalysis --sample-config
+# Clone and install
+git clone https://github.com/mdemirhan/diskanalysis.git
+cd diskanalysis
+uv sync
+
+# Analyze current directory (interactive TUI)
+uv run diskanalysis
+
+# Analyze a specific path
+uv run diskanalysis ~/src
+
+# Non-interactive summary
+uv run diskanalysis --summary ~/src
+
+# Focus on caches
+uv run diskanalysis --cache ~/src
+
+# Focus on temp/build artifacts
+uv run diskanalysis --temp ~/src
 ```
-
-Config is fully rule-driven:
-
-- temp patterns
-- cache patterns
-- build artifact patterns
-- custom patterns
-- thresholds
-- additional temp/cache paths
-- depth controls
 
 ## TUI Views
 
-- `Overview`
-- `Browse`
-- `Large Dir`
-- `Large File`
-- `Temp`
+Switch views with `Tab`/`Shift+Tab` or press the shortcut key directly.
+
+| Key | View | Description |
+|-----|------|-------------|
+| `o` | **Overview** | Total size, file/dir counts, temp/cache/build totals, largest folders |
+| `b` | **Browse** | Expandable directory tree with size bars and timestamps |
+| `d` | **Folders by Size** | Paginated list of largest directories |
+| `f` | **Files by Size** | Paginated list of largest individual files |
+| `t` | **Temporary Files** | All detected temp, cache, and build artifact items |
 
 ## Keybindings
 
-Global:
+### Navigation
 
-- `q` / `Ctrl+C`: quit
-- `?`: help
-- `Tab` / `Shift+Tab`: next/previous view
-- `o`, `b`, `t`, `d`, `f`: jump to view
+| Key | Action |
+|-----|--------|
+| `j` / `k` / `Arrow keys` | Move up/down |
+| `gg` / `G` | Jump to top/bottom |
+| `Ctrl+U` / `Ctrl+D` | Page up/down |
+| `[` / `]` | Previous/next page (paginated views) |
 
-Browse:
+### Browse View
 
-- `j/k` or arrows: move
-- `h/l` or left/right: collapse/expand, parent/drill-in
-- `Enter`: drill in
-- `Backspace`: drill out
-- `Space`: toggle expand/collapse
-- `gg`/`Home`: top
-- `G`/`End`: bottom
-- `PgUp`/`PgDn`, `Ctrl+U`/`Ctrl+D`: page
+| Key | Action |
+|-----|--------|
+| `l` / `Right` / `Enter` | Expand or drill into directory |
+| `h` / `Left` / `Backspace` | Collapse or go to parent |
+| `Space` | Toggle expand/collapse |
 
-Temp:
+### General
 
-- `[` / `]`: prev/next page
+| Key | Action |
+|-----|--------|
+| `/` | Search/filter rows |
+| `Escape` | Clear active filter |
+| `y` | Yank full path to clipboard |
+| `Y` | Yank display name to clipboard |
+| `?` | Toggle help overlay |
+| `q` | Quit |
 
-## Test
+## CLI Options
 
-```bash
-uv run pytest
+```
+uv run diskanalysis [PATH] [OPTIONS]
 ```
 
-## Safety
+| Option | Description |
+|--------|-------------|
+| `--summary` / `-s` | Non-interactive summary output |
+| `--temp` / `-t` | Focus on temp/build artifacts |
+| `--cache` / `-c` | Focus on caches |
+| `--top-folders` | Focus on largest folders |
+| `--top-files` | Focus on largest files |
+| `--workers` / `-w` | Number of scan threads (default: from config) |
+| `--max-depth` | Maximum directory depth to scan |
+| `--top` | Number of items in summary output |
+| `--page-size` | Rows per page in TUI |
+| `--sample-config` | Print full sample config and exit |
 
-DiskAnalysis is analysis-only. It does not delete, move, or modify scanned files.
+## Configuration
+
+Config file: `~/.config/diskanalysis/config.json`
+
+Generate a sample config with all defaults:
+
+```bash
+uv run diskanalysis --sample-config > ~/.config/diskanalysis/config.json
+```
+
+Key settings:
+
+```json
+{
+  "scanWorkers": 4,
+  "maxDepth": null,
+  "pageSize": 100,
+  "overviewTopFolders": 100,
+  "scrollStep": 20,
+  "summaryTopCount": 15,
+  "additionalTempPaths": [],
+  "additionalCachePaths": [],
+  "tempPatterns": [...],
+  "cachePatterns": [...],
+  "buildArtifactPatterns": [...]
+}
+```
+
+Each pattern rule:
+
+```json
+{
+  "name": "npm cache",
+  "pattern": "**/.npm/**",
+  "category": "cache",
+  "applyTo": "both",
+  "stopRecursion": false
+}
+```
+
+## Performance
+
+Benchmarked on a 2024 MacBook Pro (M4 Pro):
+
+| Directory | Files | Dirs | Time |
+|-----------|-------|------|------|
+| ~/src | 295k | 38k | ~3s |
+| ~ | 2.1M | 323k | ~22s |
+
+The scanner is I/O-bound. The `FileSystem` abstraction layer adds zero measurable overhead compared to direct `os.scandir` calls (verified via wall-clock benchmarking).
+
+## Development
+
+```bash
+# Install with dev dependencies
+uv sync
+
+# Run tests
+uv run pytest
+
+# Lint and format
+uv run ruff check
+uv run ruff format
+
+# Type check
+uv run basedpyright
+```
+
+## Tech Stack
+
+| Component | Tool |
+|-----------|------|
+| CLI framework | [Typer](https://typer.tiangolo.com/) |
+| TUI framework | [Textual](https://textual.textualize.io/) |
+| Terminal rendering | [Rich](https://rich.readthedocs.io/) |
+| Error handling | [result](https://github.com/rustedpy/result) (Rust-style `Result[T, E]`) |
+| Type checking | [basedpyright](https://docs.basedpyright.com/) (strict mode) |
+| Linting/formatting | [Ruff](https://docs.astral.sh/ruff/) |
+| Testing | [pytest](https://docs.pytest.org/) |
+| Package management | [uv](https://docs.astral.sh/uv/) |
+
+## License
+
+MIT

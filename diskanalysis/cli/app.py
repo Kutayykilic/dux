@@ -17,15 +17,12 @@ from result import Err
 
 from diskanalysis.config.defaults import default_config
 from diskanalysis.config.loader import load_config, sample_config_json
-from diskanalysis.models.enums import InsightCategory, NodeKind
+from diskanalysis.models.enums import InsightCategory
+from diskanalysis.models.insight import Insight
 from diskanalysis.models.scan import ScanError, ScanErrorCode, ScanOptions, ScanResult
 from diskanalysis.services.insights import filter_insights, generate_insights
 from diskanalysis.services.scanner import scan_path
-from diskanalysis.services.summary import (
-    render_focused_summary,
-    render_summary,
-    render_top_nodes,
-)
+from diskanalysis.services.summary import render_focused_summary, render_summary
 from diskanalysis.ui.app import DiskAnalyzerApp
 
 console = Console()
@@ -229,42 +226,33 @@ def run(
         if not has_focus:
             render_summary(console, snapshot.root, snapshot.stats, bundle, config)
         else:
+            sections: list[tuple[str, list[Insight]]] = []
             if temp:
-                focused = filter_insights(
-                    bundle, {InsightCategory.TEMP, InsightCategory.BUILD_ARTIFACT}
-                )
-                render_focused_summary(
-                    console,
-                    "Temp / Build Summary",
-                    snapshot.root.size_bytes,
-                    focused,
-                    config.summary_top_count,
+                sections.append(
+                    (
+                        "Largest Temporary Files",
+                        filter_insights(
+                            bundle,
+                            {InsightCategory.TEMP, InsightCategory.BUILD_ARTIFACT},
+                        ),
+                    )
                 )
             if cache:
-                focused = filter_insights(bundle, {InsightCategory.CACHE})
-                render_focused_summary(
-                    console,
-                    "Cache Summary",
-                    snapshot.root.size_bytes,
-                    focused,
-                    config.summary_top_count,
+                sections.append(
+                    (
+                        "Largest Cache Files",
+                        filter_insights(bundle, {InsightCategory.CACHE}),
+                    )
                 )
-            if top_folders:
-                render_top_nodes(
-                    console,
-                    "Top Folders",
-                    snapshot.root,
-                    config.summary_top_count,
-                    NodeKind.DIRECTORY,
-                )
-            if top_files:
-                render_top_nodes(
-                    console,
-                    "Top Files",
-                    snapshot.root,
-                    config.summary_top_count,
-                    NodeKind.FILE,
-                )
+            render_focused_summary(
+                console,
+                snapshot.root,
+                snapshot.stats,
+                sections,
+                config.summary_top_count,
+                top_folders=top_folders,
+                top_files=top_files,
+            )
         raise typer.Exit(0)
 
     initial_view = "overview"

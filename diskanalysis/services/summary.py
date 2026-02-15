@@ -22,6 +22,29 @@ def _stats_panel(root: ScanNode, stats: ScanStats) -> Panel:
     return Panel(body, title="Scan Summary", border_style="blue")
 
 
+def _insights_table(title: str, insights: list[Insight], top_n: int) -> Table:
+    table = Table(title=title, header_style="bold yellow")
+    table.add_column("Path")
+    table.add_column("Category")
+    table.add_column("Size", justify="right")
+    for item in insights[:top_n]:
+        table.add_row(
+            item.path,
+            item.category.value,
+            format_bytes(item.size_bytes),
+        )
+    return table
+
+
+def _top_nodes_table(title: str, root: ScanNode, top_n: int, kind: NodeKind) -> Table:
+    table = Table(title=title, header_style="bold yellow")
+    table.add_column("Path")
+    table.add_column("Size", justify="right")
+    for node in top_nodes(root, top_n, kind):
+        table.add_row(node.path, format_bytes(node.size_bytes))
+    return table
+
+
 def render_summary(
     console: Console,
     root: ScanNode,
@@ -60,54 +83,23 @@ def render_summary(
     console.print(cat_table)
 
 
-def render_top_nodes(
-    console: Console,
-    title: str,
-    root: ScanNode,
-    top_n: int,
-    kind: NodeKind,
-) -> None:
-    console.print(
-        Panel(
-            f"Analyzed: [bold]{format_bytes(root.size_bytes)}[/bold]",
-            title=title,
-        )
-    )
-
-    candidates = top_nodes(root, top_n, kind)
-
-    table = Table(title="Top Candidates", header_style="bold yellow")
-    table.add_column("Path")
-    table.add_column("Size", justify="right")
-
-    for node in candidates:
-        table.add_row(node.path, format_bytes(node.size_bytes))
-    console.print(table)
-
-
 def render_focused_summary(
     console: Console,
-    title: str,
-    analyzed_total: int,
-    insights: list[Insight],
+    root: ScanNode,
+    stats: ScanStats,
+    sections: list[tuple[str, list[Insight]]],
     top_n: int,
+    top_folders: bool = False,
+    top_files: bool = False,
 ) -> None:
-    console.print(
-        Panel(
-            f"Analyzed: [bold]{format_bytes(analyzed_total)}[/bold]",
-            title=title,
-        )
-    )
+    console.print(_stats_panel(root, stats))
 
-    table = Table(title="Top Candidates", header_style="bold yellow")
-    table.add_column("Path")
-    table.add_column("Category")
-    table.add_column("Size", justify="right")
+    for title, insights in sections:
+        console.print(_insights_table(title, insights, top_n))
 
-    for item in insights[:top_n]:
-        table.add_row(
-            item.path,
-            item.category.value,
-            format_bytes(item.size_bytes),
+    if top_folders:
+        console.print(
+            _top_nodes_table("Largest Folders", root, top_n, NodeKind.DIRECTORY)
         )
-    console.print(table)
+    if top_files:
+        console.print(_top_nodes_table("Largest Files", root, top_n, NodeKind.FILE))
