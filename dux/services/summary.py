@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from dux.models.enums import InsightCategory, NodeKind
@@ -12,7 +13,8 @@ from dux.services.tree import top_nodes
 
 
 def _trim(path: str, root_prefix: str) -> str:
-    return path[len(root_prefix) :] if path.startswith(root_prefix) else path
+    raw = path[len(root_prefix) :] if path.startswith(root_prefix) else path
+    return escape(raw)
 
 
 def _insights_table(

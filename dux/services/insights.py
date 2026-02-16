@@ -126,15 +126,17 @@ def generate_insights(root: ScanNode, config: AppConfig) -> InsightBundle:
             for child in reversed(node.children):
                 stack.append((child, local_in_temp_cache))
 
-    # --- merge heaps into a single sorted list, deduplicating ---
+    # --- merge heaps into a single sorted list ---
+    # Dedupe within each category only (lazy heap eviction leaves stale
+    # entries).  Cross-category duplicates are kept so that aggregate
+    # counters and filter_insights stay consistent.
     all_insights: list[Insight] = []
-    final_seen: set[str] = set()
     for cat in InsightCategory:
-        # Extract largest-first from each heap.
+        cat_seen: set[str] = set()
         entries = sorted(heaps[cat], key=lambda e: e[0], reverse=True)
         for _, path, insight in entries:
-            if path not in final_seen:
-                final_seen.add(path)
+            if path not in cat_seen:
+                cat_seen.add(path)
                 all_insights.append(insight)
 
     all_insights.sort(key=lambda x: x.disk_usage, reverse=True)
