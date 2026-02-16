@@ -12,7 +12,7 @@ CONFIG_PATH = "~/.config/dux/config.json"
 
 
 def load_config(path: str | None = None, fs: FileSystem = DEFAULT_FS) -> Result[AppConfig, str]:
-    resolved = path or fs.expanduser(CONFIG_PATH)
+    resolved = fs.expanduser(path or CONFIG_PATH)
     if not fs.exists(resolved):
         return Ok(default_config())
 

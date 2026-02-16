@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass
 from typing import Callable, override
 
+from rich.markup import escape
 from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
@@ -64,6 +65,13 @@ class _PagedState:
     @property
     def total_rows(self) -> int:
         return len(self.all_rows) if self.all_rows is not None else 0
+
+
+@dataclass(slots=True)
+class _FilteredRowsCache:
+    source_rows: list[DisplayRow]
+    filter_text: str
+    rows: list[DisplayRow]
 
 
 class HelpOverlay(ModalScreen[None]):
@@ -219,6 +227,7 @@ class DuxApp(App[None]):
         self.pending_g = False
         self._rows_cache: dict[str, list[DisplayRow]] = {}
         self._paged_states: dict[str, _PagedState] = {v: _PagedState() for v in _PAGED_VIEWS}
+        self._filtered_rows_cache: dict[str, _FilteredRowsCache] = {}
         self._view_cursor: dict[str, int] = {}
         self._view_scroll: dict[str, float] = {}
         self._view_filter: dict[str, str] = {}
@@ -267,6 +276,7 @@ class DuxApp(App[None]):
 
     def _invalidate_rows(self, view: str) -> None:
         self._rows_cache.pop(view, None)
+        self._filtered_rows_cache.pop(view, None)
         if view in _PAGED_VIEWS:
             self._paged_states[view] = _PagedState()
 
@@ -274,7 +284,7 @@ class DuxApp(App[None]):
         self._invalidate_rows("browse")
 
     def _render_header_rows(self) -> None:
-        self.query_one("#path-row", Static).update(Text.from_markup(f"[#81a2be]Path:[/] {self.root.path}"))
+        self.query_one("#path-row", Static).update(Text.from_markup(f"[#81a2be]Path:[/] {escape(self.root.path)}"))
 
         tab_items: list[str] = []
         for tab in TABS:
@@ -344,7 +354,7 @@ class DuxApp(App[None]):
 
         state = self._paged_states.get(self.current_view)
         if state is not None and state.all_rows is not None:
-            paged_total = len(self._filter_rows(state.all_rows))
+            paged_total = len(self._filtered_rows(self.current_view, state.all_rows))
         else:
             paged_total = state.total_rows if state is not None else 0
 
@@ -360,7 +370,7 @@ class DuxApp(App[None]):
         if trimmed_text:
             left += f" | {trimmed_text}"
         if active_filter:
-            left += f" | Filter: '{active_filter}'"
+            left += f" | Filter: '{escape(active_filter)}'"
 
         hints = "q quit | ? help | Tab views | / search | y yank path | Y yank name"
         if self.current_view == "browse":
@@ -390,7 +400,7 @@ class DuxApp(App[None]):
 
         cached = self._rows_cache.get(self.current_view)
         if cached is not None:
-            return self._filter_rows(cached)
+            return self._filtered_rows(self.current_view, cached)
 
         if self.current_view == "overview":
             rows = self._overview_rows()
@@ -400,13 +410,13 @@ class DuxApp(App[None]):
             rows = []
 
         self._rows_cache[self.current_view] = rows
-        return self._filter_rows(rows)
+        return self._filtered_rows(self.current_view, rows)
 
     def _paged_view_rows(self, view: str) -> list[DisplayRow]:
         state = self._paged_states[view]
         if state.all_rows is None:
             state.all_rows, state.total_items = self._build_all_paged_rows(view)
-        filtered = self._filter_rows(state.all_rows)
+        filtered = self._filtered_rows(view, state.all_rows)
         filtered_count = len(filtered)
         total_pages = max(1, (filtered_count + self._page_size - 1) // self._page_size)
         state.page_index = max(0, min(state.page_index, total_pages - 1))
@@ -426,17 +436,17 @@ class DuxApp(App[None]):
         rows = self._top_nodes_rows(NodeKind.FILE)
         return rows, self.stats.files
 
-    def _filtered_page_count(self, state: _PagedState) -> int:
+    def _filtered_page_count(self, view: str, state: _PagedState) -> int:
         if state.all_rows is None:
             return 1
-        filtered = self._filter_rows(state.all_rows)
+        filtered = self._filtered_rows(view, state.all_rows)
         return max(1, (len(filtered) + self._page_size - 1) // self._page_size)
 
     def _next_page(self) -> None:
         if self.current_view not in _PAGED_VIEWS:
             return
         state = self._paged_states[self.current_view]
-        if state.page_index >= self._filtered_page_count(state) - 1:
+        if state.page_index >= self._filtered_page_count(self.current_view, state) - 1:
             return
         state.page_index += 1
         self.selected_index = 0
@@ -458,16 +468,31 @@ class DuxApp(App[None]):
         state = self._paged_states[view]
         if state.all_rows is None or state.total_items == 0:
             return ""
+        if self._view_filter.get(view):
+            filtered_count = len(self._filtered_rows(view, state.all_rows))
+            return f"Showing {filtered_count:,} of {state.total_rows:,} results (filtered)"
         if state.total_rows < state.total_items:
             return f"Showing {state.total_rows:,} of {state.total_items:,} results"
         return f"Showing {state.total_rows:,} results"
 
-    def _filter_rows(self, rows: list[DisplayRow]) -> list[DisplayRow]:
-        pattern = self._view_filter.get(self.current_view, "")
-        if not pattern:
-            return rows
-        p = pattern.lower()
-        return [r for r in rows if p in r.name.lower() or p in r.path.lower()]
+    def _filtered_rows(self, view: str, rows: list[DisplayRow]) -> list[DisplayRow]:
+        filter_text = self._view_filter.get(view, "")
+        cached = self._filtered_rows_cache.get(view)
+        if cached is not None and cached.source_rows is rows and cached.filter_text == filter_text:
+            return cached.rows
+
+        if not filter_text:
+            filtered = rows
+        else:
+            needle = filter_text.lower()
+            filtered = [r for r in rows if needle in r.name.lower() or needle in r.path.lower()]
+
+        self._filtered_rows_cache[view] = _FilteredRowsCache(
+            source_rows=rows,
+            filter_text=filter_text,
+            rows=filtered,
+        )
+        return filtered
 
     def _category_size_bytes(self, *categories: InsightCategory) -> int:
         return sum(self.bundle.category_size_bytes.get(cat, 0) for cat in categories)
@@ -857,15 +882,18 @@ class DuxApp(App[None]):
             return True
         return False
 
+    def _reset_view_position(self) -> None:
+        self.selected_index = 0
+        if self.current_view in _PAGED_VIEWS:
+            self._paged_states[self.current_view].page_index = 0
+        self._refresh_all()
+
     def _on_search_result(self, value: str | None) -> None:
         if value:
             self._view_filter[self.current_view] = value
         else:
             self._view_filter.pop(self.current_view, None)
-        self.selected_index = 0
-        if self.current_view in _PAGED_VIEWS:
-            self._paged_states[self.current_view].page_index = 0
-        self._refresh_all()
+        self._reset_view_position()
 
     @override
     def on_key(self, event) -> None:  # type: ignore[override]
@@ -875,10 +903,7 @@ class DuxApp(App[None]):
         if key == "escape":
             if self._view_filter.get(self.current_view):
                 self._view_filter.pop(self.current_view, None)
-                self.selected_index = 0
-                if self.current_view in _PAGED_VIEWS:
-                    self._paged_states[self.current_view].page_index = 0
-                self._refresh_all()
+                self._reset_view_position()
             return
 
         if self._handle_global_key(key):

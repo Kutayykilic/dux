@@ -9,6 +9,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console, Group
+from rich.markup import escape
 from rich.live import Live
 from rich.panel import Panel
 from rich.spinner import Spinner
@@ -45,7 +46,7 @@ def _render_scan_panel(progress: _ScanProgress, workers: int, phase: str) -> Pan
     elapsed = time.perf_counter() - progress.start_time
     body = Group(
         Spinner("dots", text=phase, style="bold #8abeb7"),
-        Text.from_markup(f"[#81a2be]Path:[/] {_truncate_path(progress.current_path)}"),
+        Text.from_markup(f"[#81a2be]Path:[/] {escape(_truncate_path(progress.current_path))}"),
         Text.from_markup(
             f"[#b5bd68]Scanned:[/] {progress.directories:,} dirs, {progress.files:,} files"
             + f"    [#f0c674]Workers:[/] {workers}"
@@ -182,7 +183,7 @@ def run(
     scan_result = _scan_with_progress(Path(path), scan_options, workers=config.scan_workers)
     if isinstance(scan_result, Err):
         error = scan_result.unwrap_err()
-        console.print(f"[red]Scan failed for {error.path}: {error.message}[/]")
+        console.print(f"[red]Scan failed for {escape(error.path)}: {escape(error.message)}[/]")
         raise typer.Exit(1)
     snapshot = scan_result.unwrap()
 

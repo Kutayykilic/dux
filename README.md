@@ -9,7 +9,7 @@ A fast terminal disk usage analyzer for macOS and Linux. Scans directories in pa
 - **Parallel scanning** with configurable thread pool (default 4 workers)
 - **Interactive TUI** with 5 views, vim keybindings, search/filter, pagination
 - **Composable CLI flags** — `--top-temp`, `--top-cache`, `--top-dirs`, `--top-files` each print their own table and can be freely combined
-- **670+ built-in patterns** for detecting temp files, caches, and build artifacts across dozens of ecosystems (Node, Python, Rust, Go, JVM, Swift, C++, and more)
+- **59 built-in pattern rules** for detecting temp files, caches, and build artifacts across dozens of ecosystems (Node, Python, Rust, Go, JVM, Swift, C++, and more)
 - **Fully configurable** via JSON config with pattern overrides and custom paths
 - **Analysis-only** — never deletes, moves, or modifies your files
 

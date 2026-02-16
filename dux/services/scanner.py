@@ -21,6 +21,10 @@ from dux.models.scan import (
     ScanStats,
 )
 
+# Shared empty list for file nodes — saves ~56 bytes per file vs a unique [].
+# IMPORTANT: never append to this; only directory nodes get their own mutable [].
+_LEAF: list[ScanNode] = []
+
 
 @dataclass(slots=True, frozen=True)
 class _Task:
@@ -155,7 +159,7 @@ def scan_path(
                         kind=NodeKind.DIRECTORY if st.is_dir else NodeKind.FILE,
                         size_bytes=0 if st.is_dir else st.size,
                         disk_usage=0 if st.is_dir else st.disk_usage,
-                        children=[],
+                        children=[] if st.is_dir else _LEAF,
                     )
                     task.node.children.append(node)
 
@@ -169,7 +173,7 @@ def scan_path(
 
                     if (local_dirs + local_files) % 100 == 0:
                         emit_progress(node.path, local_files, local_dirs)
-            except OSError:
+            except Exception:  # noqa: BLE001
                 local_errors += 1
             finally:
                 _flush_local()
