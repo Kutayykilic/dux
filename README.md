@@ -107,6 +107,8 @@ By default dux prints a CLI summary table. Use `--interactive` / `-i` to launch 
 | `--overview-dirs` | Top directories shown in TUI overview |
 | `--scroll-step` | Lines to jump on PgUp/PgDn in TUI |
 | `--page-size` | Rows per page in TUI |
+| `--scanner` / `-S` | Scanner variant: `auto`, `python`, `posix`, `macos` (default: auto) |
+| `--verbose` / `-v` | Print GIL status, scanner, and timing info |
 | `--sample-config` | Print full sample config and exit |
 
 ## Configuration
@@ -159,7 +161,32 @@ Benchmarked on a 2024 MacBook Pro (M4 Pro):
 | ~/src | 295k | 38k | ~3s |
 | ~ | 2.1M | 323k | ~22s |
 
-The scanner is I/O-bound. The `FileSystem` abstraction layer adds zero measurable overhead compared to direct `os.scandir` calls (verified via wall-clock benchmarking).
+The scanner is I/O-bound. dux ships three scanner backends and automatically selects the best one for your platform:
+
+| Scanner | Platform | Mechanism |
+|---------|----------|-----------|
+| **MacOSScanner** | macOS (default) | C extension using `getattrlistbulk` — fetches all entries + stat data in a single syscall per batch |
+| **PosixScanner** | Linux (GIL enabled) | C extension using `readdir` + `lstat` — releases the GIL during I/O for better thread utilization |
+| **PythonScanner** | Fallback / GIL disabled | Pure Python via `os.scandir` — also used for testing via the `FileSystem` abstraction |
+
+Override with `--scanner posix|macos|python`.
+
+### Free-Threaded Python
+
+dux supports free-threaded Python (3.13t+). Both C extensions (`_walker`, `_matcher`) declare `Py_MOD_GIL_NOT_USED`, enabling true parallel execution without GIL contention. Use `--verbose` to see GIL status and active scanner at runtime.
+
+When the GIL is disabled, `default_scanner()` selects `PythonScanner` — the C `readdir` wrapper's overhead becomes negligible compared to the parallelism gains from true multi-threading, and the pure Python scanner has the advantage of working through the `FileSystem` abstraction layer.
+
+### Pattern Matching
+
+Pattern matching (insight generation) is the second-hottest path after scanning. dux avoids naive fnmatch-per-rule by classifying all 59 rules at compile time into fast string operations:
+
+- **EXACT** — `dict` lookup on lowercased basename (`O(1)`)
+- **CONTAINS** — Aho-Corasick automaton (C extension) for multi-pattern substring search in a single pass over the path
+- **ENDSWITH / STARTSWITH** — simple `str.endswith` / `str.startswith` on the basename
+- **GLOB** — fallback to `fnmatch` only for patterns that can't be decomposed
+
+Brace expansion (`{a,b}`) is resolved at compile time. All matcher values are lowercased once at build time; paths are lowercased once per node for case-insensitive matching.
 
 ## Development
 
@@ -186,7 +213,7 @@ uv run basedpyright
 | TUI framework | [Textual](https://textual.textualize.io/) |
 | Terminal rendering | [Rich](https://rich.readthedocs.io/) |
 | Error handling | [result](https://github.com/rustedpy/result) (Rust-style `Result[T, E]`) |
-| Type checking | [basedpyright](https://docs.basedpyright.com/) (strict mode) |
+| Type checking | [basedpyright](https://docs.basedpyright.com/) (standard mode) |
 | Linting/formatting | [Ruff](https://docs.astral.sh/ruff/) |
 | Testing | [pytest](https://docs.pytest.org/) |
 | Package management | [uv](https://docs.astral.sh/uv/) |
