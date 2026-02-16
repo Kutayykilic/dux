@@ -9,6 +9,7 @@ dependencies = [
   "rich>=13.9.0",
   "textual>=0.89.0",
   "result>=0.17.0",
+  "setuptools>=82.0.0",
 ]
 
 [project.optional-dependencies]
@@ -33,7 +34,7 @@ pythonpath = ["."]
 addopts = "-q"
 
 [tool.basedpyright]
-pythonVersion = "3.13"
+pythonVersion = "3.14"
 typeCheckingMode = "standard"
 reportImplicitOverride = true
 reportIncompatibleMethodOverride = true

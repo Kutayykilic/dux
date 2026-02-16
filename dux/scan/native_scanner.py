@@ -14,6 +14,6 @@ class NativeScanner(ThreadedScannerBase):
 
     @override
     def _scan_dir(self, parent: ScanNode, path: str) -> tuple[list[ScanNode], int, int, int]:
-        from dux._walker import scan_dir_nodes  # type: ignore[import-not-found]
+        from dux._walker import scan_dir_nodes
 
-        return scan_dir_nodes(path, parent, LEAF_CHILDREN, NodeKind.DIRECTORY, NodeKind.FILE, ScanNode)  # type: ignore[no-any-return]
+        return scan_dir_nodes(path, parent, LEAF_CHILDREN, NodeKind.DIRECTORY, NodeKind.FILE, ScanNode)
