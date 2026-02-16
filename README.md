@@ -4,6 +4,20 @@ A fast terminal disk usage analyzer for macOS and Linux. Scans directories in pa
 
 > **100% AI-written.** The vast majority of this codebase was written by Claude (Anthropic), with contributions from Codex (OpenAI). Human involvement was limited to directing, reviewing, and benchmarking.
 
+## Screenshots
+
+**CLI summary** (`uv run dux ~/src`)
+
+![CLI summary table](media/summary.png)
+
+**TUI overview** (`uv run dux -i`)
+
+![TUI overview tab](media/overview.png)
+
+**TUI browse** — expandable directory tree with disk usage bars
+
+![TUI browse tab](media/browse.png)
+
 ## Features
 
 - **Parallel scanning** with configurable thread pool (default 4 workers)
