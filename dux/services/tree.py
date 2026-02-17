@@ -6,9 +6,9 @@ from collections.abc import Iterator
 from dux.models.enums import NodeKind
 from dux.models.scan import ScanNode
 
-# Shared empty list for file nodes — saves ~56 bytes per file vs a unique [].
-# IMPORTANT: never append to this; only directory nodes get their own mutable [].
-LEAF_CHILDREN: list[ScanNode] = []
+# Shared empty tuple for file nodes — saves ~56 bytes per file vs a unique [].
+# Immutable: directory nodes get their own mutable list; file nodes share this.
+LEAF_CHILDREN: tuple[()] = ()
 
 
 def finalize_sizes(root: ScanNode) -> None:

@@ -32,7 +32,6 @@ typedef struct {
     int n_nodes;
     int cap_nodes;
     PyObject **values;
-    int *key_lens;
     int n_values;
     int cap_values;
     int built;  /* 1 after make_automaton() */
@@ -62,7 +61,7 @@ ac_new_node(AhoCorasickObject *self)
 }
 
 static int
-ac_new_value(AhoCorasickObject *self, PyObject *val, int key_len)
+ac_new_value(AhoCorasickObject *self, PyObject *val)
 {
     if (self->n_values >= self->cap_values) {
         int new_cap = self->cap_values * 2;
@@ -70,15 +69,10 @@ ac_new_value(AhoCorasickObject *self, PyObject *val, int key_len)
             self->values, sizeof(PyObject *) * (size_t)new_cap);
         if (!tv) return -1;
         self->values = tv;
-        int *tk = (int *)realloc(self->key_lens,
-                                 sizeof(int) * (size_t)new_cap);
-        if (!tk) return -1;
-        self->key_lens = tk;
         self->cap_values = new_cap;
     }
     Py_INCREF(val);
     self->values[self->n_values] = val;
-    self->key_lens[self->n_values] = key_len;
     return self->n_values++;
 }
 
@@ -103,11 +97,8 @@ AhoCorasick_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     self->cap_values = 64;
     self->values = (PyObject **)malloc(sizeof(PyObject *) * (size_t)self->cap_values);
-    self->key_lens = (int *)malloc(sizeof(int) * (size_t)self->cap_values);
-    if (!self->values || !self->key_lens) {
+    if (!self->values) {
         free(self->nodes);
-        free(self->values);
-        free(self->key_lens);
         Py_DECREF(self);
         return PyErr_NoMemory();
     }
@@ -118,7 +109,6 @@ AhoCorasick_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (ac_new_node(self) < 0) {
         free(self->nodes);
         free(self->values);
-        free(self->key_lens);
         Py_DECREF(self);
         return PyErr_NoMemory();
     }
@@ -133,7 +123,6 @@ AhoCorasick_dealloc(AhoCorasickObject *self)
         Py_XDECREF(self->values[i]);
     }
     free(self->values);
-    free(self->key_lens);
     free(self->nodes);
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
@@ -170,7 +159,7 @@ AhoCorasick_add_word(AhoCorasickObject *self, PyObject *args)
     }
 
     /* Store value at terminal node */
-    int vid = ac_new_value(self, value, (int)key_len);
+    int vid = ac_new_value(self, value);
     if (vid < 0) return PyErr_NoMemory();
     self->nodes[cur].output = vid;
 

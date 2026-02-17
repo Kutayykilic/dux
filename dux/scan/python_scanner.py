@@ -39,7 +39,7 @@ class PythonScanner(ThreadedScannerBase):
                     kind=NodeKind.FILE,
                     size_bytes=st.size,
                     disk_usage=st.disk_usage,
-                    children=LEAF_CHILDREN,
+                    children=LEAF_CHILDREN,  # type: ignore[arg-type]  # immutable sentinel
                 )
                 parent.children.append(node)
                 files += 1

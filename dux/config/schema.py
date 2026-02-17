@@ -44,7 +44,7 @@ class AppConfig:
     page_size: int = 100
     max_insights_per_category: int = 1000
     overview_top_dirs: int = 100
-    scroll_step: int = 10
+    scroll_step: int = 20
 
     def to_dict(self) -> dict[str, Any]:
         additional: dict[str, list[str]] = {cat.value: paths for cat, paths in self.additional_paths.items()}

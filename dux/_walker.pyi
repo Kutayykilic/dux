@@ -4,7 +4,7 @@ from dux.models.scan import ScanNode
 def scan_dir_nodes(
     path: str,
     parent: ScanNode,
-    leaf: list[ScanNode],
+    leaf: tuple[()],
     kind_dir: NodeKind,
     kind_file: NodeKind,
     scan_node_cls: type[ScanNode],
@@ -12,7 +12,7 @@ def scan_dir_nodes(
 def scan_dir_bulk_nodes(
     path: str,
     parent: ScanNode,
-    leaf: list[ScanNode],
+    leaf: tuple[()],
     kind_dir: NodeKind,
     kind_file: NodeKind,
     scan_node_cls: type[ScanNode],

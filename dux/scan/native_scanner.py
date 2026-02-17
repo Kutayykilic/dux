@@ -9,7 +9,7 @@ from dux.scan._base import ThreadedScannerBase
 from dux.services.tree import LEAF_CHILDREN
 
 type _ScanFn = Callable[
-    [str, ScanNode, list[ScanNode], NodeKind, NodeKind, type[ScanNode]],
+    [str, ScanNode, tuple[()], NodeKind, NodeKind, type[ScanNode]],
     tuple[list[ScanNode], int, int, int],
 ]
 
