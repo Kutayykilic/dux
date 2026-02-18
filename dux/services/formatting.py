@@ -16,6 +16,22 @@ def format_bytes(size: int) -> str:
     return f"{value:.1f} {UNITS[unit]}"
 
 
+def format_size_colored(size: int) -> str:
+    """Coloring added for the size of the file.
+
+    Color coding:
+    - GB: Red (High usage)
+    - MB: Yellow (Medium usage)
+    - KB/B: Green (Low usage)
+    """
+    formatted = format_bytes(size)
+    if "TB" in formatted or "PB" in formatted or "GB" in formatted:
+        return f"[bold red]{formatted}[/]"
+    if "MB" in formatted:
+        return f"[bold yellow]{formatted}[/]"
+    return f"[bold green]{formatted}[/]"
+
+
 def relative_bar(size: int, total: int, width: int = 16) -> str:
     if width <= 0 or total <= 0:
         return ""

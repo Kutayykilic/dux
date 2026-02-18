@@ -18,7 +18,7 @@ from dux.config.schema import AppConfig
 from dux.models.enums import InsightCategory, NodeKind
 from dux.models.insight import CategoryStats, Insight, InsightBundle
 from dux.models.scan import ScanNode, ScanStats
-from dux.services.formatting import format_bytes, relative_bar
+from dux.services.formatting import format_bytes, format_size_colored, relative_bar
 from dux.services.tree import top_nodes
 
 
@@ -36,7 +36,7 @@ _TAB_LABELS: dict[str, str] = {
 @dataclass(slots=True)
 class DisplayRow:
     path: str
-    name: str
+    name: str | Text
     size_bytes: int
     type_label: str = ""
     category: str | None = None
@@ -370,9 +370,9 @@ class DuxApp(App[None]):
             self.rows[0].disk_usage if self.current_view == "browse" else self.root.disk_usage,
         )
         for row in self.rows:
-            disk_text = format_bytes(row.disk_usage) if row.disk_usage > 0 else ""
-            size_text = format_bytes(row.size_bytes) if row.size_bytes > 0 else ""
-            cells: list[str] = [row.name]
+            disk_text = format_size_colored(row.disk_usage) if row.disk_usage > 0 else ""
+            size_text = format_size_colored(row.size_bytes) if row.size_bytes > 0 else ""
+            cells: list[str | Text] = [row.name]
             if self._apparent_size:
                 cells.append(size_text)
             if is_temp:
@@ -599,10 +599,12 @@ class DuxApp(App[None]):
         top_dirs = top_nodes(self.root, self._overview_top, NodeKind.DIRECTORY)
         for node in top_dirs:
             display_path = self._relative_path(node.path)
+            # Directory: bold blue, no icon (matches used preference)
+            name_styled = f"[bold blue]{escape(display_path)}[/]"
             rows.append(
                 DisplayRow(
                     path=node.path,
-                    name=display_path,
+                    name=name_styled,
                     size_bytes=node.size_bytes,
                     disk_usage=node.disk_usage,
                 )
@@ -617,9 +619,9 @@ class DuxApp(App[None]):
             node, depth = stack.pop()
             if node.kind is NodeKind.DIRECTORY:
                 marker = "▼" if node.path in self.expanded else "▶"
-                label = f"{'  ' * depth}{marker} {node.name}"
+                label = Text("  " * depth) + Text(f"{marker} ", style="bold yellow") + Text(node.name, style="bold blue")
             else:
-                label = f"{'  ' * depth}  {node.name}"
+                label = Text("  " * depth) + Text("  ", style="default") + Text("📄 ", style="default") + Text(node.name, style="white")
             rows.append(
                 DisplayRow(
                     path=node.path,
@@ -643,11 +645,18 @@ class DuxApp(App[None]):
             display_path = self._relative_path(item.path)
             label = item.category.label
             node = self.node_by_path.get(item.path)
-            type_label = "Dir" if node is not None and node.is_dir else "File"
+            is_dir = node is not None and node.is_dir
+            type_label = "Dir" if is_dir else "File"
+            
+            if is_dir:
+                 name_styled = f"[bold blue]{escape(display_path)}[/]"
+            else:
+                 name_styled = f"📄 [white]{escape(display_path)}[/]"
+
             rows.append(
                 DisplayRow(
                     path=item.path,
-                    name=display_path,
+                    name=name_styled,
                     size_bytes=item.size_bytes,
                     category=label,
                     type_label=type_label,
@@ -660,10 +669,15 @@ class DuxApp(App[None]):
         rows: list[DisplayRow] = []
         for node in top_nodes(self.root, self._top_n_limit, kind):
             display_path = self._relative_path(node.path)
+            if kind == NodeKind.DIRECTORY:
+                 name_styled = f"[bold blue]{escape(display_path)}[/]"
+            else:
+                 name_styled = f"📄 [white]{escape(display_path)}[/]"
+            
             rows.append(
                 DisplayRow(
                     path=node.path,
-                    name=display_path,
+                    name=name_styled,
                     size_bytes=node.size_bytes,
                     disk_usage=node.disk_usage,
                 )

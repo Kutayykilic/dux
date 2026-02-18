@@ -55,7 +55,7 @@ class TestAppendSize:
         row: list[str] = []
         _append_size(row, 1024, True)
         assert len(row) == 1
-        assert "1.0 KB" in row[0]
+        assert "[green]1.0 KB[/]" in row[0]
 
     def test_apparent_size_false(self) -> None:
         row: list[str] = []

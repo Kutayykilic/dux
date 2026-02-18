@@ -76,17 +76,23 @@ dux -i ~/src       # Interactive TUI
 dux -v ~/src       # Verbose (shows GIL status, scanner, timing)
 ```
 
-## TUI Views
+## Interactive Mode (TUI)
 
-Switch views with `Tab`/`Shift+Tab` or press the shortcut key directly.
+Launch with `uv run dux -i`.
+
+### Switching Views
+
+The app has 5 different views. You can switch between them using **Tab** / **Shift+Tab**, or by pressing the dedicated shortcut key:
 
 | Key | View | Description |
 |-----|------|-------------|
-| `o` | **Overview** | Total disk usage, file/dir counts, temp/cache/build totals, largest directories |
-| `b` | **Browse** | Expandable directory tree with disk usage bars |
-| `d` | **Directories by Size** | Paginated list of largest directories |
-| `f` | **Files by Size** | Paginated list of largest individual files |
-| `t` | **Temporary Files** | All detected temp, cache, and build artifact items |
+| **`o`** | **Overview** | General summary of disk usage and largest directories |
+| **`b`** | **Browse** | Interactive directory tree (like a file explorer) |
+| **`d`** | **Directories** | List of largest directories (paginated) |
+| **`f`** | **Files** | List of largest files (paginated) |
+| **`t`** | **Temp / Artifacts** | Detected temporary files, caches, and build artifacts |
+
+> **Tip:** You can press `?` at any time to see a help popup with all shortcuts.
 
 ## Keybindings
 
@@ -99,13 +105,16 @@ Switch views with `Tab`/`Shift+Tab` or press the shortcut key directly.
 | `Ctrl+U` / `Ctrl+D` | Page up/down |
 | `[` / `]` | Previous/next page (paginated views) |
 
-### Browse View
+### Browsing Directories
+
+In the **Browse (`b`)** view, use these keys to navigate the tree:
 
 | Key | Action |
 |-----|--------|
-| `l` / `Right` / `Enter` | Expand or drill into directory |
-| `h` / `Left` / `Backspace` | Collapse or go to parent |
-| `Space` | Toggle expand/collapse |
+| **`Right`** / **`l`** / **`Enter`** | **Expand** a folder or **Go Inside** |
+| **`Left`** / **`h`** / **`Backspace`** | **Collapse** a folder or **Go to Parent** |
+| **`Space`** | Toggle expand/collapse |
+| **`Up`** / **`Down`** / **`j`** / **`k`** | Move selection up/down |
 
 ### General
 

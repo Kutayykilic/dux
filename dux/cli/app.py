@@ -108,14 +108,12 @@ def _scan_with_progress(path: Path, options: ScanOptions, workers: int, scanner:
         refresh_per_second=12,
         transient=True,
     ) as live:
-        while not done.is_set():
+        while not done.wait(timeout=0.08):
             # Shallow-copy progress under the lock so we don't hold it
             # during rendering (which is slow relative to the lock).
             with lock:
                 snapshot = replace(progress)
             live.update(_render_scan_panel(snapshot, workers, "Scanning directory tree..."))
-            # ~12.5 Hz refresh, matching refresh_per_second=12 above.
-            time.sleep(0.08)
 
         with lock:
             final = replace(progress)

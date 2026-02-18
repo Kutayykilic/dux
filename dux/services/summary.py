@@ -7,7 +7,7 @@ from rich.table import Table
 from dux.models.enums import InsightCategory, NodeKind
 from dux.models.insight import Insight, InsightBundle
 from dux.models.scan import ScanNode, ScanStats
-from dux.services.formatting import format_bytes
+from dux.services.formatting import format_bytes, format_size_colored
 from dux.services.insights import filter_insights
 from dux.services.tree import top_nodes
 
@@ -17,6 +17,13 @@ def _trim(path: str, root_prefix: str) -> str:
     return escape(raw)
 
 
+def _format_path(path: str, kind: NodeKind, root_prefix: str) -> str:
+    trimmed = _trim(path, root_prefix)
+    if kind == NodeKind.DIRECTORY:
+        return f"📁 [bold blue]{trimmed}[/]"
+    return f"📄 [white]{trimmed}[/]"
+
+
 def _add_size_column(table: Table, apparent_size: bool) -> None:
     if apparent_size:
         table.add_column("Size", justify="right")
@@ -24,26 +31,26 @@ def _add_size_column(table: Table, apparent_size: bool) -> None:
 
 def _append_size(row: list[str], size_bytes: int, apparent_size: bool) -> None:
     if apparent_size:
-        row.append(format_bytes(size_bytes))
+        row.append(format_size_colored(size_bytes))
 
 
 def _insights_table(
     title: str, insights: list[Insight], top_n: int, root_prefix: str, *, apparent_size: bool = False
 ) -> Table:
-    table = Table(title=title, header_style="bold yellow")
-    table.add_column("Path")
+    table = Table(title=title, header_style="bold yellow", box=None, show_lines=False)
+    table.add_column("Path", ratio=3)
     table.add_column("Type", justify="center")
     table.add_column("Category")
     _add_size_column(table, apparent_size)
     table.add_column("Disk", justify="right")
     for item in insights[:top_n]:
         row: list[str] = [
-            _trim(item.path, root_prefix),
+            _format_path(item.path, item.kind, root_prefix),
             "DIR" if item.kind is NodeKind.DIRECTORY else "FILE",
             item.category.value,
         ]
         _append_size(row, item.size_bytes, apparent_size)
-        row.append(format_bytes(item.disk_usage))
+        row.append(format_size_colored(item.disk_usage))
         table.add_row(*row)
     return table
 
@@ -51,14 +58,14 @@ def _insights_table(
 def _top_nodes_table(
     title: str, root: ScanNode, top_n: int, kind: NodeKind, root_prefix: str, *, apparent_size: bool = False
 ) -> Table:
-    table = Table(title=title, header_style="bold yellow")
-    table.add_column("Path")
+    table = Table(title=title, header_style="bold yellow", box=None, show_lines=False)
+    table.add_column("Path", ratio=3)
     _add_size_column(table, apparent_size)
     table.add_column("Disk", justify="right")
     for node in top_nodes(root, top_n, kind):
-        row: list[str] = [_trim(node.path, root_prefix)]
+        row: list[str] = [_format_path(node.path, kind, root_prefix)]
         _append_size(row, node.size_bytes, apparent_size)
-        row.append(format_bytes(node.disk_usage))
+        row.append(format_size_colored(node.disk_usage))
         table.add_row(*row)
     return table
 
@@ -71,19 +78,19 @@ def render_summary(
     *,
     apparent_size: bool = False,
 ) -> None:
-    table = Table(title="Top Level Summary", header_style="bold cyan")
-    table.add_column("Path")
+    table = Table(title="Top Level Summary", header_style="bold cyan", box=None, show_lines=False)
+    table.add_column("Path", ratio=3)
     table.add_column("Type", justify="center")
     _add_size_column(table, apparent_size)
     table.add_column("Disk", justify="right")
 
     for child in sorted(root.children, key=lambda n: n.disk_usage, reverse=True):
         row: list[str] = [
-            _trim(child.path, root_prefix),
+            _format_path(child.path, child.kind, root_prefix),
             "DIR" if child.kind is NodeKind.DIRECTORY else "FILE",
         ]
         _append_size(row, child.size_bytes, apparent_size)
-        row.append(format_bytes(child.disk_usage))
+        row.append(format_size_colored(child.disk_usage))
         table.add_row(*row)
 
     table.add_section()
